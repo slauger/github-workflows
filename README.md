@@ -43,28 +43,28 @@ Validation for Puppet Control Repositories (R10K/Code Manager).
 ```
 .
 ├── .github/workflows/
+│   ├── puppet-module-validate.yml       # Module validation
+│   ├── puppet-module-release.yml        # Semantic release
+│   ├── hieradata-validate.yml           # YAML validation
+│   ├── control-repo-validate.yml        # Control-repo validation
 │   ├── puppet-module/
-│   │   ├── validate.yml       # Module validation
-│   │   ├── release.yml        # Semantic release
-│   │   └── README.md          # Documentation
+│   │   └── README.md                    # Documentation
 │   ├── hieradata/
-│   │   ├── validate.yml       # YAML validation
-│   │   └── README.md          # Documentation
+│   │   └── README.md                    # Documentation
 │   └── control-repo/
-│       ├── validate.yml       # Control-repo validation
-│       └── README.md          # Documentation
+│       └── README.md                    # Documentation
 │
 ├── examples/
 │   ├── puppet-module/
-│   │   ├── ci.yml             # Example workflow
-│   │   └── .releaserc.yml     # Semantic-release config
+│   │   ├── ci.yml                       # Example workflow
+│   │   └── .releaserc.yml               # Semantic-release config
 │   ├── hieradata/
-│   │   ├── ci.yml             # Example workflow
-│   │   └── .yamllint          # yamllint config
+│   │   ├── ci.yml                       # Example workflow
+│   │   └── .yamllint                    # yamllint config
 │   └── control-repo/
-│       └── ci.yml             # Example workflow
+│       └── ci.yml                       # Example workflow
 │
-└── README.md                  # This file
+└── README.md                            # This file
 ```
 
 ## Usage Example
@@ -80,12 +80,15 @@ on:
 
 jobs:
   validate:
-    uses: YOUR_ORG/github-workflows/.github/workflows/WORKFLOW_TYPE/validate.yml@main
+    uses: YOUR_ORG/github-workflows/.github/workflows/WORKFLOW_NAME.yml@main
 ```
 
 Replace:
-- `YOUR_ORG/github-workflows` with your repository path
-- `WORKFLOW_TYPE` with `puppet-module`, `hieradata`, or `control-repo`
+- `YOUR_ORG/github-workflows` with your repository path (e.g., `slauger/github-workflows`)
+- `WORKFLOW_NAME` with one of:
+  - `puppet-module-validate`, `puppet-module-release`
+  - `hieradata-validate`
+  - `control-repo-validate`
 
 ## Contributing
 

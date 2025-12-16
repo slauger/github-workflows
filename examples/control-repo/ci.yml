@@ -23,7 +23,7 @@ jobs:
   # Validate control repository on all branches and PRs
   validate:
     name: Validate Control Repository
-    uses: YOUR_ORG/github-workflows/.github/workflows/control-repo/validate.yml@main
+    uses: YOUR_ORG/github-workflows/.github/workflows/control-repo-validate.yml@main
     with:
       # Optional: Puppet version to use
       # puppet-version: "7"

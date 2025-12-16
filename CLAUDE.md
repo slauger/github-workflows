@@ -1,0 +1,1 @@
+- hier getestet - was ist falsch? https://github.com/slauger/puppet-github_actions_runner/actions/runs/20266770050 - https://github.com/slauger/puppet-github_actions_runner/actions/runs/20266770050 - invalid value workflow reference: workflows must be defined at the top level of the .github/workflows/ directory

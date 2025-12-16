@@ -21,7 +21,7 @@ jobs:
   # Run validation on all branches (develop, main, and PRs)
   validate:
     name: Validate Module
-    uses: YOUR_ORG/github-workflows/.github/workflows/puppet-module/validate.yml@main
+    uses: YOUR_ORG/github-workflows/.github/workflows/puppet-module-validate.yml@main
     with:
       puppet-version: "7"
       ruby-version: "3.1"
@@ -33,7 +33,7 @@ jobs:
     name: Release Module
     # Only run on main/master branch (not on PRs or develop)
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
-    uses: YOUR_ORG/github-workflows/.github/workflows/puppet-module/release.yml@main
+    uses: YOUR_ORG/github-workflows/.github/workflows/puppet-module-release.yml@main
     with:
       puppet-version: "7"
       ruby-version: "3.1"
