@@ -44,8 +44,7 @@ jobs:
     #   ruby-version: "3.2"   # default
     #   node-version: "22"    # default
     #   dry-run: false        # set to true to test without creating releases
-    secrets:
-      github-token: ${{ secrets.GITHUB_TOKEN }}
+    secrets: inherit  # Passes GITHUB_TOKEN to the workflow
 
 # Workflow execution flow:
 #

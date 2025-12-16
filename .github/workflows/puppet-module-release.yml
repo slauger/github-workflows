@@ -29,8 +29,8 @@ on:
         type: string
         default: '3.2'
     secrets:
-      github-token:
-        description: 'GitHub token for creating releases (usually secrets.GITHUB_TOKEN)'
+      GITHUB_TOKEN:
+        description: 'GitHub token for creating releases'
         required: true
 
 jobs:
@@ -92,7 +92,7 @@ jobs:
       - name: Run semantic-release (dry-run)
         if: ${{ inputs.dry-run }}
         env:
-          GITHUB_TOKEN: ${{ secrets.github-token }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GIT_AUTHOR_NAME: semantic-release-bot
           GIT_AUTHOR_EMAIL: semantic-release-bot@users.noreply.github.com
           GIT_COMMITTER_NAME: semantic-release-bot
@@ -104,7 +104,7 @@ jobs:
       - name: Run semantic-release
         if: ${{ !inputs.dry-run }}
         env:
-          GITHUB_TOKEN: ${{ secrets.github-token }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GIT_AUTHOR_NAME: semantic-release-bot
           GIT_AUTHOR_EMAIL: semantic-release-bot@users.noreply.github.com
           GIT_COMMITTER_NAME: semantic-release-bot
