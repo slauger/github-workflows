@@ -18,9 +18,10 @@ on:
       - master
 
 jobs:
-  # Run validation on all branches (develop, main, and PRs)
+  # Run validation on develop and PRs (not on main, as release job includes validation)
   validate:
     name: Validate Module
+    if: github.ref != 'refs/heads/main' && github.ref != 'refs/heads/master'
     uses: YOUR_ORG/github-workflows/.github/workflows/puppet-module-validate.yml@main
     # All parameters are optional and have sensible defaults
     # with:
@@ -28,10 +29,9 @@ jobs:
     #   ruby-version: "3.2"  # default
     #   skip-pdk: false      # default, set to true to use individual tools
 
-  # Only run release when pushing to main/master
+  # Only run release when pushing to main/master (includes validation before release)
   release:
     name: Release Module
-    # Only run on main/master branch (not on PRs or develop)
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     permissions:
       contents: write
@@ -55,8 +55,8 @@ jobs:
 #   1. validate runs → checks all lint/syntax/tests
 #
 # On push to main (merge from develop):
-#   1. validate runs → checks all lint/syntax/tests
-#   2. If validate passes → release runs:
+#   1. release runs (includes validation) →
+#      - validates all lint/syntax/tests
 #      - semantic-release analyzes commits
 #      - determines new version
 #      - updates metadata.json
