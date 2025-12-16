@@ -1,0 +1,276 @@
+name: Validate Control Repository
+
+on:
+  workflow_call:
+    inputs:
+      working-directory:
+        description: 'Working directory for the control repository'
+        required: false
+        type: string
+        default: '.'
+      puppet-version:
+        description: 'Puppet version to use for validation'
+        required: false
+        type: string
+        default: '7'
+      ruby-version:
+        description: 'Ruby version to use'
+        required: false
+        type: string
+        default: '3.1'
+      site-modules-path:
+        description: 'Path to site modules directory'
+        required: false
+        type: string
+        default: 'site'
+      puppetfile-path:
+        description: 'Path to Puppetfile'
+        required: false
+        type: string
+        default: 'Puppetfile'
+      hiera-config-path:
+        description: 'Path to hiera.yaml'
+        required: false
+        type: string
+        default: 'hiera.yaml'
+      yamllint-config:
+        description: 'Path to yamllint config file'
+        required: false
+        type: string
+        default: ''
+      strict-puppet-lint:
+        description: 'Fail on puppet-lint warnings'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  validate:
+    name: Control Repository Validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ inputs.ruby-version }}
+          bundler-cache: false
+
+      - name: Install Puppet and tools
+        run: |
+          gem install puppet -v '~> ${{ inputs.puppet-version }}'
+          gem install puppet-lint
+        working-directory: ${{ inputs.working-directory }}
+
+      - name: Install yamllint
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y yamllint
+        working-directory: ${{ inputs.working-directory }}
+
+      - name: Check Control Repository Structure
+        run: |
+          echo "Checking R10K control repository structure..."
+
+          # Check for essential files/directories
+          ERRORS=0
+
+          if [ ! -f "${{ inputs.puppetfile-path }}" ]; then
+            echo "❌ Missing Puppetfile at: ${{ inputs.puppetfile-path }}"
+            ERRORS=$((ERRORS + 1))
+          else
+            echo "✅ Found Puppetfile"
+          fi
+
+          if [ ! -f "${{ inputs.hiera-config-path }}" ]; then
+            echo "⚠️  Missing hiera.yaml at: ${{ inputs.hiera-config-path }} (optional)"
+          else
+            echo "✅ Found hiera.yaml"
+          fi
+
+          if [ ! -d "${{ inputs.site-modules-path }}" ]; then
+            echo "⚠️  No site modules directory at: ${{ inputs.site-modules-path }} (optional)"
+          else
+            echo "✅ Found site modules directory"
+          fi
+
+          if [ $ERRORS -gt 0 ]; then
+            echo ""
+            echo "❌ Control repository structure validation failed!"
+            exit 1
+          fi
+        working-directory: ${{ inputs.working-directory }}
+
+      - name: Puppetfile Syntax Check
+        run: |
+          echo "Checking Puppetfile syntax (Ruby syntax)..."
+          if [ -f "${{ inputs.puppetfile-path }}" ]; then
+            ruby -c "${{ inputs.puppetfile-path }}"
+            if [ $? -eq 0 ]; then
+              echo "✅ Puppetfile syntax is valid"
+            else
+              echo "❌ Puppetfile syntax check failed"
+              exit 1
+            fi
+          else
+            echo "⚠️  Puppetfile not found, skipping"
+          fi
+        working-directory: ${{ inputs.working-directory }}
+
+      - name: YAML Lint (hiera.yaml)
+        run: |
+          if [ -f "${{ inputs.hiera-config-path }}" ]; then
+            echo "Validating hiera.yaml..."
+
+            if [ -n "${{ inputs.yamllint-config }}" ] && [ -f "${{ inputs.yamllint-config }}" ]; then
+              yamllint -c "${{ inputs.yamllint-config }}" "${{ inputs.hiera-config-path }}"
+            elif [ -f .yamllint ]; then
+              yamllint -c .yamllint "${{ inputs.hiera-config-path }}"
+            else
+              yamllint -d "{extends: default, rules: {line-length: {max: 120}, document-start: disable}}" "${{ inputs.hiera-config-path }}"
+            fi
+
+            if [ $? -eq 0 ]; then
+              echo "✅ hiera.yaml is valid"
+            else
+              echo "❌ hiera.yaml validation failed"
+              exit 1
+            fi
+          else
+            echo "⚠️  hiera.yaml not found at ${{ inputs.hiera-config-path }}, skipping"
+          fi
+        working-directory: ${{ inputs.working-directory }}
+
+      - name: YAML Lint (additional YAML files)
+        run: |
+          echo "Checking for additional YAML files in repository..."
+
+          # Find YAML files, excluding common directories
+          YAML_FILES=$(find . -type f \( -name "*.yaml" -o -name "*.yml" \) \
+            -not -path "./.git/*" \
+            -not -path "./modules/*" \
+            -not -path "./.bundle/*" \
+            -not -path "./vendor/*" 2>/dev/null || true)
+
+          if [ -n "$YAML_FILES" ]; then
+            echo "Found YAML files to validate:"
+            echo "$YAML_FILES"
+            echo ""
+
+            if [ -n "${{ inputs.yamllint-config }}" ] && [ -f "${{ inputs.yamllint-config }}" ]; then
+              echo "$YAML_FILES" | xargs yamllint -c "${{ inputs.yamllint-config }}" || true
+            elif [ -f .yamllint ]; then
+              echo "$YAML_FILES" | xargs yamllint -c .yamllint || true
+            else
+              echo "$YAML_FILES" | xargs yamllint -d "{extends: default, rules: {line-length: {max: 120}, document-start: disable}}" || true
+            fi
+          else
+            echo "No additional YAML files found"
+          fi
+        continue-on-error: true
+        working-directory: ${{ inputs.working-directory }}
+
+      - name: Puppet Syntax Check (site modules)
+        run: |
+          if [ -d "${{ inputs.site-modules-path }}" ]; then
+            echo "Checking Puppet syntax in site modules..."
+
+            # Find all .pp files in site modules
+            PP_FILES=$(find "${{ inputs.site-modules-path }}" -name "*.pp" 2>/dev/null || true)
+
+            if [ -n "$PP_FILES" ]; then
+              echo "Found Puppet manifest files:"
+              echo "$PP_FILES" | head -5
+              if [ $(echo "$PP_FILES" | wc -l) -gt 5 ]; then
+                echo "... and $(( $(echo "$PP_FILES" | wc -l) - 5 )) more"
+              fi
+              echo ""
+
+              SYNTAX_ERRORS=0
+              while IFS= read -r file; do
+                if ! puppet parser validate "$file" 2>&1; then
+                  echo "❌ Syntax error in: $file"
+                  SYNTAX_ERRORS=$((SYNTAX_ERRORS + 1))
+                fi
+              done <<< "$PP_FILES"
+
+              if [ $SYNTAX_ERRORS -eq 0 ]; then
+                echo "✅ All Puppet manifests have valid syntax"
+              else
+                echo "❌ Found $SYNTAX_ERRORS Puppet syntax error(s)"
+                exit 1
+              fi
+            else
+              echo "⚠️  No Puppet manifest files found in ${{ inputs.site-modules-path }}"
+            fi
+          else
+            echo "⚠️  Site modules directory not found at ${{ inputs.site-modules-path }}, skipping"
+          fi
+        working-directory: ${{ inputs.working-directory }}
+
+      - name: Puppet Lint (site modules)
+        run: |
+          if [ -d "${{ inputs.site-modules-path }}" ]; then
+            echo "Running puppet-lint on site modules..."
+
+            # Find all .pp files in site modules
+            PP_FILES=$(find "${{ inputs.site-modules-path }}" -name "*.pp" 2>/dev/null || true)
+
+            if [ -n "$PP_FILES" ]; then
+              # Run puppet-lint with reasonable defaults
+              puppet-lint \
+                --no-documentation-check \
+                --no-autoloader_layout-check \
+                "${{ inputs.site-modules-path }}" || LINT_RESULT=$?
+
+              if [ "${LINT_RESULT:-0}" -eq 0 ]; then
+                echo "✅ puppet-lint found no issues"
+              else
+                echo "⚠️  puppet-lint found issues (see above)"
+                if [ "${{ inputs.strict-puppet-lint }}" = "true" ]; then
+                  echo "❌ Strict mode enabled - failing build"
+                  exit 1
+                fi
+              fi
+            else
+              echo "⚠️  No Puppet manifest files found in ${{ inputs.site-modules-path }}"
+            fi
+          else
+            echo "⚠️  Site modules directory not found at ${{ inputs.site-modules-path }}, skipping"
+          fi
+        continue-on-error: ${{ !inputs.strict-puppet-lint }}
+        working-directory: ${{ inputs.working-directory }}
+
+      - name: Validation Summary
+        if: success()
+        run: |
+          echo "✅ All control repository validations passed!"
+          echo ""
+          echo "Completed checks:"
+          echo "  - Control repository structure"
+          echo "  - Puppetfile syntax (Ruby)"
+          if [ -f "${{ inputs.hiera-config-path }}" ]; then
+            echo "  - hiera.yaml validation"
+          fi
+          if [ -d "${{ inputs.site-modules-path }}" ]; then
+            echo "  - Puppet syntax (site modules)"
+            echo "  - puppet-lint (site modules)"
+          fi
+        working-directory: ${{ inputs.working-directory }}
+
+      - name: Validation Failed
+        if: failure()
+        run: |
+          echo "❌ Control repository validation failed!"
+          echo ""
+          echo "Please fix the errors above before merging."
+          echo ""
+          echo "Common issues:"
+          echo "  - Puppetfile: Ruby syntax errors (check quotes, commas)"
+          echo "  - hiera.yaml: YAML syntax or indentation errors"
+          echo "  - Puppet manifests: syntax errors, missing commas, quotes"
+          echo "  - puppet-lint: style violations (can often be auto-fixed)"
+          exit 1

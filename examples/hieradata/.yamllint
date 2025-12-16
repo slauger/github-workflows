@@ -1,0 +1,65 @@
+# yamllint configuration for Hieradata repositories
+#
+# Copy this file to the root of your hieradata repository as .yamllint
+#
+# This configuration is optimized for Puppet Hiera data files
+
+extends: default
+
+rules:
+  # Allow longer lines (Hiera data can have long strings)
+  line-length:
+    max: 120
+    level: warning
+
+  # Comments don't need to be indented perfectly
+  comments-indentation: disable
+
+  # Hiera files often don't start with ---
+  document-start: disable
+
+  # Allow yes/no/true/false (common in Puppet/Hiera)
+  truthy:
+    allowed-values: ['true', 'false', 'yes', 'no']
+    check-keys: false
+
+  # Be flexible with empty values (common in Hiera overrides)
+  empty-values:
+    forbid-in-block-mappings: false
+    forbid-in-flow-mappings: false
+
+  # Allow inline mappings (useful for simple Hiera data)
+  braces:
+    max-spaces-inside: 1
+    level: warning
+
+  # Be lenient with brackets
+  brackets:
+    max-spaces-inside: 1
+    level: warning
+
+  # Require at least one space after comment start
+  comments:
+    min-spaces-from-content: 1
+
+  # Indentation: 2 spaces (Puppet standard)
+  indentation:
+    spaces: 2
+    indent-sequences: true
+    check-multi-line-strings: false
+
+  # Allow duplicate keys (sometimes needed for Hiera hierarchy testing)
+  key-duplicates: enable
+
+  # Trailing spaces should be removed
+  trailing-spaces: enable
+
+  # New line at end of file
+  new-line-at-end-of-file: enable
+
+# Ignore certain files/directories
+ignore: |
+  .git/
+  .github/
+  node_modules/
+  vendor/

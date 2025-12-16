@@ -1,0 +1,127 @@
+name: Release Puppet Module
+
+on:
+  workflow_call:
+    inputs:
+      working-directory:
+        description: 'Working directory for the module'
+        required: false
+        type: string
+        default: '.'
+      node-version:
+        description: 'Node.js version for semantic-release'
+        required: false
+        type: string
+        default: '20'
+      dry-run:
+        description: 'Run semantic-release in dry-run mode'
+        required: false
+        type: boolean
+        default: false
+      puppet-version:
+        description: 'Puppet version to use for validation'
+        required: false
+        type: string
+        default: '7'
+      ruby-version:
+        description: 'Ruby version to use'
+        required: false
+        type: string
+        default: '3.1'
+    secrets:
+      github-token:
+        description: 'GitHub token for creating releases (usually secrets.GITHUB_TOKEN)'
+        required: true
+
+jobs:
+  # First run validation
+  validate:
+    name: Pre-Release Validation
+    uses: ./.github/workflows/puppet-module/validate.yml
+    with:
+      puppet-version: ${{ inputs.puppet-version }}
+      ruby-version: ${{ inputs.ruby-version }}
+      working-directory: ${{ inputs.working-directory }}
+
+  # Only release if validation passes
+  release:
+    name: Semantic Release
+    runs-on: ubuntu-latest
+    needs: validate
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history needed for semantic-release
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+
+      - name: Install semantic-release and plugins
+        run: |
+          npm install --no-save \
+            semantic-release@^23.0.0 \
+            @semantic-release/commit-analyzer@^12.0.0 \
+            @semantic-release/release-notes-generator@^13.0.0 \
+            @semantic-release/changelog@^6.0.3 \
+            @semantic-release/git@^10.0.1 \
+            @semantic-release/github@^10.0.0 \
+            @google/semantic-release-replace-plugin@^1.2.7
+        working-directory: ${{ inputs.working-directory }}
+
+      - name: Verify semantic-release config
+        run: |
+          if [ ! -f .releaserc.yml ] && [ ! -f .releaserc.json ] && [ ! -f .releaserc.js ] && [ ! -f release.config.js ]; then
+            echo "❌ No semantic-release config found!"
+            echo "Please create .releaserc.yml in your repository."
+            echo "See the example config in this workflow repository."
+            exit 1
+          else
+            echo "✅ Found semantic-release config"
+          fi
+        working-directory: ${{ inputs.working-directory }}
+
+      - name: Run semantic-release (dry-run)
+        if: ${{ inputs.dry-run }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.github-token }}
+          GIT_AUTHOR_NAME: semantic-release-bot
+          GIT_AUTHOR_EMAIL: semantic-release-bot@users.noreply.github.com
+          GIT_COMMITTER_NAME: semantic-release-bot
+          GIT_COMMITTER_EMAIL: semantic-release-bot@users.noreply.github.com
+        run: |
+          npx semantic-release --dry-run
+        working-directory: ${{ inputs.working-directory }}
+
+      - name: Run semantic-release
+        if: ${{ !inputs.dry-run }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.github-token }}
+          GIT_AUTHOR_NAME: semantic-release-bot
+          GIT_AUTHOR_EMAIL: semantic-release-bot@users.noreply.github.com
+          GIT_COMMITTER_NAME: semantic-release-bot
+          GIT_COMMITTER_EMAIL: semantic-release-bot@users.noreply.github.com
+        run: |
+          npx semantic-release
+        working-directory: ${{ inputs.working-directory }}
+
+      - name: Release Summary
+        if: success() && !inputs.dry-run
+        run: |
+          echo "🎉 Release completed successfully!"
+          echo ""
+          echo "Semantic-release has:"
+          echo "  - Analyzed commits using Conventional Commits"
+          echo "  - Determined next version (if applicable)"
+          echo "  - Updated metadata.json with new version"
+          echo "  - Generated/updated CHANGELOG.md"
+          echo "  - Created Git tag and GitHub Release"
+          echo "  - Committed changes back to main branch"

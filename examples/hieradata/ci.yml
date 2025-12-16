@@ -1,0 +1,46 @@
+# Example CI workflow for a Hieradata repository
+#
+# Copy this file to .github/workflows/ci.yml in your hieradata repository
+# and adjust the repository reference to point to your workflows repository
+
+name: CI
+
+on:
+  push:
+    branches:
+      - develop
+      - main
+      - master
+  pull_request:
+    branches:
+      - develop
+      - main
+      - master
+
+jobs:
+  # Validate YAML files on all branches and PRs
+  validate:
+    name: Validate YAML
+    uses: YOUR_ORG/github-workflows/.github/workflows/hieradata/validate.yml@main
+    with:
+      # Optional: specify working directory if hieradata is in a subdirectory
+      # working-directory: '.'
+
+      # Optional: path to custom yamllint config file
+      # yamllint-config: '.yamllint'
+
+      # Optional: fail on warnings (default: true)
+      # strict: true
+
+      # Optional: file pattern to validate (default: '.' validates all)
+      # file-pattern: 'data/'
+
+# Workflow execution flow:
+#
+# On any push or PR:
+#   1. validate runs → checks all YAML files for syntax errors
+#
+# Tips:
+#   - Create a .yamllint config file in your repo root for custom rules
+#   - Use file-pattern to validate only specific directories (e.g., 'data/')
+#   - Set strict: false to allow warnings without failing the build

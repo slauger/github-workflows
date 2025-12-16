@@ -1,0 +1,183 @@
+name: Validate Puppet Module
+
+on:
+  workflow_call:
+    inputs:
+      puppet-version:
+        description: 'Puppet version to use for validation'
+        required: false
+        type: string
+        default: '7'
+      ruby-version:
+        description: 'Ruby version to use'
+        required: false
+        type: string
+        default: '3.1'
+      pdk-version:
+        description: 'PDK version to use'
+        required: false
+        type: string
+        default: 'latest'
+      skip-pdk:
+        description: 'Skip PDK validation (use individual tools instead)'
+        required: false
+        type: boolean
+        default: false
+      working-directory:
+        description: 'Working directory for the module'
+        required: false
+        type: string
+        default: '.'
+
+jobs:
+  validate:
+    name: Validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Needed for conventional commits check
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: ${{ inputs.ruby-version }}
+          bundler-cache: false
+
+      - name: Install PDK
+        if: ${{ !inputs.skip-pdk }}
+        run: |
+          wget https://apt.puppet.com/puppet-tools-release-jammy.deb
+          sudo dpkg -i puppet-tools-release-jammy.deb
+          sudo apt-get update
+          sudo apt-get install -y pdk
+        working-directory: ${{ inputs.working-directory }}
+
+      - name: Install Puppet and tools
+        run: |
+          gem install puppet -v '~> ${{ inputs.puppet-version }}'
+          gem install puppet-lint
+          gem install metadata-json-lint
+        working-directory: ${{ inputs.working-directory }}
+
+      - name: Install yamllint
+        run: |
+          sudo apt-get install -y yamllint
+        working-directory: ${{ inputs.working-directory }}
+
+      - name: Install markdownlint
+        run: |
+          npm install -g markdownlint-cli
+        working-directory: ${{ inputs.working-directory }}
+
+      - name: YAML Lint
+        run: |
+          if [ -f .yamllint ]; then
+            yamllint .
+          else
+            yamllint -d "{extends: default, rules: {line-length: {max: 120}, comments: {min-spaces-from-content: 1}}}" .
+          fi
+        continue-on-error: false
+        working-directory: ${{ inputs.working-directory }}
+
+      - name: JSON Lint (metadata.json)
+        run: |
+          if [ -f metadata.json ]; then
+            metadata-json-lint metadata.json
+          else
+            echo "⚠️  No metadata.json found - skipping"
+            exit 0
+          fi
+        working-directory: ${{ inputs.working-directory }}
+
+      - name: Markdown Lint
+        run: |
+          if compgen -G "*.md" > /dev/null; then
+            markdownlint *.md || true
+          else
+            echo "No markdown files found - skipping"
+          fi
+        continue-on-error: true  # Don't fail on markdown issues
+        working-directory: ${{ inputs.working-directory }}
+
+      - name: PDK Validation
+        if: ${{ !inputs.skip-pdk }}
+        run: |
+          pdk validate --parallel
+        working-directory: ${{ inputs.working-directory }}
+
+      - name: Puppet Syntax Check
+        if: ${{ inputs.skip-pdk }}
+        run: |
+          find . -name '*.pp' -exec puppet parser validate {} \;
+        working-directory: ${{ inputs.working-directory }}
+
+      - name: Puppet Lint
+        if: ${{ inputs.skip-pdk }}
+        run: |
+          if compgen -G "manifests/*.pp" > /dev/null || compgen -G "**/*.pp" > /dev/null; then
+            puppet-lint \
+              --fail-on-warnings \
+              --no-documentation-check \
+              --no-autoloader_layout-check \
+              manifests/ || true
+          else
+            echo "No Puppet manifests found - skipping"
+          fi
+        continue-on-error: true
+        working-directory: ${{ inputs.working-directory }}
+
+      - name: Check Conventional Commits
+        run: |
+          echo "Checking for conventional commit format..."
+          # Get commits since last tag, or all commits if no tags
+          if git describe --tags --abbrev=0 2>/dev/null; then
+            LAST_TAG=$(git describe --tags --abbrev=0)
+            COMMITS=$(git log ${LAST_TAG}..HEAD --pretty=format:"%s")
+          else
+            COMMITS=$(git log --pretty=format:"%s")
+          fi
+
+          # Check if we're on a PR
+          if [ -n "${{ github.event.pull_request.number }}" ]; then
+            echo "📋 Checking commits in PR..."
+            COMMITS=$(git log origin/${{ github.event.pull_request.base.ref }}..HEAD --pretty=format:"%s")
+          fi
+
+          VALID=true
+          while IFS= read -r commit; do
+            if [[ ! "$commit" =~ ^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?!?:\ .+ ]]; then
+              echo "❌ Invalid commit message: $commit"
+              echo "   Must follow Conventional Commits format: type(scope): description"
+              echo "   Valid types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert"
+              VALID=false
+            fi
+          done <<< "$COMMITS"
+
+          if [ "$VALID" = false ]; then
+            echo ""
+            echo "💡 Example: feat(init): add initial module structure"
+            exit 1
+          else
+            echo "✅ All commits follow Conventional Commits format"
+          fi
+        working-directory: ${{ inputs.working-directory }}
+
+      - name: Validation Summary
+        if: success()
+        run: |
+          echo "✅ All validations passed!"
+          echo ""
+          echo "Completed checks:"
+          echo "  - YAML Lint"
+          echo "  - JSON Lint (metadata.json)"
+          echo "  - Markdown Lint"
+          if [ "${{ inputs.skip-pdk }}" = "false" ]; then
+            echo "  - PDK Validation (includes Puppet syntax, puppet-lint, etc.)"
+          else
+            echo "  - Puppet Syntax Check"
+            echo "  - Puppet Lint"
+          fi
+          echo "  - Conventional Commits"

@@ -1,0 +1,63 @@
+# Example CI workflow for a Puppet Control Repository (R10K)
+#
+# Copy this file to .github/workflows/ci.yml in your control repository
+# and adjust the repository reference to point to your workflows repository
+
+name: CI
+
+on:
+  push:
+    branches:
+      - production
+      - development
+      - main
+      - master
+  pull_request:
+    branches:
+      - production
+      - development
+      - main
+      - master
+
+jobs:
+  # Validate control repository on all branches and PRs
+  validate:
+    name: Validate Control Repository
+    uses: YOUR_ORG/github-workflows/.github/workflows/control-repo/validate.yml@main
+    with:
+      # Optional: Puppet version to use
+      # puppet-version: "7"
+
+      # Optional: Ruby version to use
+      # ruby-version: "3.1"
+
+      # Optional: Path to site modules (default: "site")
+      # site-modules-path: "site"
+
+      # Optional: Path to Puppetfile (default: "Puppetfile")
+      # puppetfile-path: "Puppetfile"
+
+      # Optional: Path to hiera.yaml (default: "hiera.yaml")
+      # hiera-config-path: "hiera.yaml"
+
+      # Optional: Path to custom yamllint config
+      # yamllint-config: ".yamllint"
+
+      # Optional: Fail on puppet-lint warnings (default: false)
+      # strict-puppet-lint: false
+
+# Workflow execution flow:
+#
+# On any push or PR:
+#   1. validate runs → checks:
+#      - Control repository structure
+#      - Puppetfile syntax (Ruby)
+#      - hiera.yaml (YAML lint)
+#      - Puppet syntax (site/ modules)
+#      - puppet-lint (site/ modules)
+#
+# Tips:
+#   - Use branch protection rules to require passing checks
+#   - Configure yamllint rules via .yamllint in repo root
+#   - Set strict-puppet-lint: true to fail on lint warnings
+#   - Common control-repo branches: production, development, feature/*

@@ -1,0 +1,116 @@
+name: Validate Hieradata
+
+on:
+  workflow_call:
+    inputs:
+      working-directory:
+        description: 'Working directory for the hieradata repository'
+        required: false
+        type: string
+        default: '.'
+      yamllint-config:
+        description: 'Path to yamllint config file (relative to working-directory)'
+        required: false
+        type: string
+        default: ''
+      strict:
+        description: 'Fail on warnings (strict mode)'
+        required: false
+        type: boolean
+        default: true
+      file-pattern:
+        description: 'File pattern to validate (e.g., "**/*.yaml" or "data/")'
+        required: false
+        type: string
+        default: '.'
+
+jobs:
+  validate:
+    name: YAML Validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install yamllint
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y yamllint
+        working-directory: ${{ inputs.working-directory }}
+
+      - name: Check for yamllint config
+        id: check-config
+        run: |
+          if [ -n "${{ inputs.yamllint-config }}" ] && [ -f "${{ inputs.yamllint-config }}" ]; then
+            echo "config_found=true" >> $GITHUB_OUTPUT
+            echo "config_file=${{ inputs.yamllint-config }}" >> $GITHUB_OUTPUT
+            echo "✅ Using custom yamllint config: ${{ inputs.yamllint-config }}"
+          elif [ -f .yamllint ]; then
+            echo "config_found=true" >> $GITHUB_OUTPUT
+            echo "config_file=.yamllint" >> $GITHUB_OUTPUT
+            echo "✅ Using .yamllint config from repository"
+          elif [ -f .yamllint.yml ]; then
+            echo "config_found=true" >> $GITHUB_OUTPUT
+            echo "config_file=.yamllint.yml" >> $GITHUB_OUTPUT
+            echo "✅ Using .yamllint.yml config from repository"
+          else
+            echo "config_found=false" >> $GITHUB_OUTPUT
+            echo "ℹ️  No yamllint config found, using default configuration"
+          fi
+        working-directory: ${{ inputs.working-directory }}
+
+      - name: YAML Lint (with config)
+        if: steps.check-config.outputs.config_found == 'true'
+        run: |
+          echo "Running yamllint with config: ${{ steps.check-config.outputs.config_file }}"
+          yamllint -c "${{ steps.check-config.outputs.config_file }}" ${{ inputs.file-pattern }}
+        continue-on-error: ${{ !inputs.strict }}
+        working-directory: ${{ inputs.working-directory }}
+
+      - name: YAML Lint (default config)
+        if: steps.check-config.outputs.config_found == 'false'
+        run: |
+          echo "Running yamllint with default Hiera-friendly configuration"
+          yamllint -d "{
+            extends: default,
+            rules: {
+              line-length: {max: 120},
+              comments: {min-spaces-from-content: 1},
+              comments-indentation: disable,
+              document-start: disable,
+              truthy: {
+                allowed-values: ['true', 'false', 'yes', 'no']
+              }
+            }
+          }" ${{ inputs.file-pattern }}
+        continue-on-error: ${{ !inputs.strict }}
+        working-directory: ${{ inputs.working-directory }}
+
+      - name: Validation Summary
+        if: success()
+        run: |
+          echo "✅ All YAML files are valid!"
+          echo ""
+          echo "Validated pattern: ${{ inputs.file-pattern }}"
+          if [ "${{ steps.check-config.outputs.config_found }}" = "true" ]; then
+            echo "Configuration: ${{ steps.check-config.outputs.config_file }}"
+          else
+            echo "Configuration: default (Hiera-friendly)"
+          fi
+          echo "Strict mode: ${{ inputs.strict }}"
+        working-directory: ${{ inputs.working-directory }}
+
+      - name: Validation Failed
+        if: failure()
+        run: |
+          echo "❌ YAML validation failed!"
+          echo ""
+          echo "Please fix the YAML syntax errors above."
+          echo ""
+          echo "Tips:"
+          echo "  - Check indentation (use spaces, not tabs)"
+          echo "  - Ensure colons are followed by a space"
+          echo "  - Quote strings with special characters"
+          echo "  - Validate locally: yamllint ${{ inputs.file-pattern }}"
+          exit 1

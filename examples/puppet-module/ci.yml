@@ -1,0 +1,62 @@
+# Example CI/CD workflow for a Puppet module repository
+#
+# Copy this file to .github/workflows/ci.yml in your Puppet module repository
+# and adjust the repository reference to point to your workflows repository
+
+name: CI/CD
+
+on:
+  push:
+    branches:
+      - develop
+      - main
+      - master
+  pull_request:
+    branches:
+      - develop
+      - main
+      - master
+
+jobs:
+  # Run validation on all branches (develop, main, and PRs)
+  validate:
+    name: Validate Module
+    uses: YOUR_ORG/github-workflows/.github/workflows/puppet-module/validate.yml@main
+    with:
+      puppet-version: "7"
+      ruby-version: "3.1"
+      # Optionally skip PDK and use individual tools instead
+      # skip-pdk: true
+
+  # Only run release when pushing to main/master
+  release:
+    name: Release Module
+    # Only run on main/master branch (not on PRs or develop)
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    uses: YOUR_ORG/github-workflows/.github/workflows/puppet-module/release.yml@main
+    with:
+      puppet-version: "7"
+      ruby-version: "3.1"
+      node-version: "20"
+      # Enable dry-run to test without creating actual releases
+      # dry-run: true
+    secrets:
+      github-token: ${{ secrets.GITHUB_TOKEN }}
+
+# Workflow execution flow:
+#
+# On develop branch:
+#   1. validate runs → checks all lint/syntax/tests
+#
+# On PR to develop or main:
+#   1. validate runs → checks all lint/syntax/tests
+#
+# On push to main (merge from develop):
+#   1. validate runs → checks all lint/syntax/tests
+#   2. If validate passes → release runs:
+#      - semantic-release analyzes commits
+#      - determines new version
+#      - updates metadata.json
+#      - generates/updates CHANGELOG.md
+#      - creates GitHub Release
+#      - commits changes back to main
