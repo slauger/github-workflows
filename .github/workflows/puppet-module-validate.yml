@@ -23,6 +23,11 @@ on:
         required: false
         type: boolean
         default: false
+      strict-commits:
+        description: 'Fail build on non-conventional commits (default: false, only warns)'
+        required: false
+        type: boolean
+        default: false
       working-directory:
         description: 'Working directory for the module'
         required: false
@@ -146,21 +151,48 @@ jobs:
           fi
 
           VALID=true
+          WARNINGS=0
           while IFS= read -r commit; do
+            # Skip merge commits
+            if [[ "$commit" =~ ^Merge\ .+ ]]; then
+              echo "ℹ️  Skipping merge commit: $commit"
+              continue
+            fi
+
+            # Check conventional commits format
             if [[ ! "$commit" =~ ^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?!?:\ .+ ]]; then
-              echo "❌ Invalid commit message: $commit"
-              echo "   Must follow Conventional Commits format: type(scope): description"
+              if [ "${{ inputs.strict-commits }}" = "true" ]; then
+                echo "❌ Invalid commit message: $commit"
+              else
+                echo "⚠️  Non-conventional commit: $commit"
+              fi
+              echo "   Expected format: type(scope): description"
               echo "   Valid types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert"
-              VALID=false
+              WARNINGS=$((WARNINGS + 1))
+              if [ "${{ inputs.strict-commits }}" = "true" ]; then
+                VALID=false
+              fi
             fi
           done <<< "$COMMITS"
 
-          if [ "$VALID" = false ]; then
+          if [ "$WARNINGS" -gt 0 ]; then
             echo ""
             echo "💡 Example: feat(init): add initial module structure"
+            if [ "${{ inputs.strict-commits }}" = "true" ]; then
+              echo "⚠️  Strict mode enabled - failing build due to $WARNINGS non-conventional commit(s)"
+            else
+              echo "ℹ️  Found $WARNINGS non-conventional commit(s) - continuing (set strict-commits: true to fail)"
+            fi
+          fi
+
+          if [ "$VALID" = false ]; then
             exit 1
           else
-            echo "✅ All commits follow Conventional Commits format"
+            if [ "$WARNINGS" -eq 0 ]; then
+              echo "✅ All commits follow Conventional Commits format"
+            else
+              echo "✅ Validation passed with warnings"
+            fi
           fi
         working-directory: ${{ inputs.working-directory }}
 
