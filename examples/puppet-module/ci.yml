@@ -22,11 +22,11 @@ jobs:
   validate:
     name: Validate Module
     uses: YOUR_ORG/github-workflows/.github/workflows/puppet-module-validate.yml@main
-    with:
-      puppet-version: "7"
-      ruby-version: "3.1"
-      # Optionally skip PDK and use individual tools instead
-      # skip-pdk: true
+    # All parameters are optional and have sensible defaults
+    # with:
+    #   puppet-version: "8"  # default
+    #   ruby-version: "3.2"  # default
+    #   skip-pdk: false      # default, set to true to use individual tools
 
   # Only run release when pushing to main/master
   release:
@@ -38,12 +38,12 @@ jobs:
       issues: write
       pull-requests: write
     uses: YOUR_ORG/github-workflows/.github/workflows/puppet-module-release.yml@main
-    with:
-      puppet-version: "7"
-      ruby-version: "3.1"
-      node-version: "20"
-      # Enable dry-run to test without creating actual releases
-      # dry-run: true
+    # All parameters are optional and have sensible defaults
+    # with:
+    #   puppet-version: "8"   # default
+    #   ruby-version: "3.2"   # default
+    #   node-version: "22"    # default
+    #   dry-run: false        # set to true to test without creating releases
     secrets:
       github-token: ${{ secrets.GITHUB_TOKEN }}
 
