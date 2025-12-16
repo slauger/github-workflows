@@ -7,12 +7,12 @@ on:
         description: 'Puppet version to use for validation'
         required: false
         type: string
-        default: '7'
+        default: '8'
       ruby-version:
         description: 'Ruby version to use'
         required: false
         type: string
-        default: '3.1'
+        default: '3.2'
       pdk-version:
         description: 'PDK version to use'
         required: false
@@ -122,11 +122,10 @@ jobs:
               --fail-on-warnings \
               --no-documentation-check \
               --no-autoloader_layout-check \
-              manifests/ || true
+              manifests/
           else
             echo "No Puppet manifests found - skipping"
           fi
-        continue-on-error: true
         working-directory: ${{ inputs.working-directory }}
 
       - name: Check Conventional Commits

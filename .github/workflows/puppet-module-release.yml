@@ -12,7 +12,7 @@ on:
         description: 'Node.js version for semantic-release'
         required: false
         type: string
-        default: '20'
+        default: '22'
       dry-run:
         description: 'Run semantic-release in dry-run mode'
         required: false
@@ -22,12 +22,12 @@ on:
         description: 'Puppet version to use for validation'
         required: false
         type: string
-        default: '7'
+        default: '8'
       ruby-version:
         description: 'Ruby version to use'
         required: false
         type: string
-        default: '3.1'
+        default: '3.2'
     secrets:
       github-token:
         description: 'GitHub token for creating releases (usually secrets.GITHUB_TOKEN)'
