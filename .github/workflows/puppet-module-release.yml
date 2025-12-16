@@ -37,7 +37,7 @@ jobs:
   # First run validation
   validate:
     name: Pre-Release Validation
-    uses: ./.github/workflows/puppet-module/validate.yml
+    uses: ./.github/workflows/puppet-module-validate.yml
     with:
       puppet-version: ${{ inputs.puppet-version }}
       ruby-version: ${{ inputs.ruby-version }}
